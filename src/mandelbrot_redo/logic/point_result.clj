@@ -2,9 +2,15 @@
   (:require [mandelbrot-redo.logic.helpers :as mh]))
 
 ; TODO: Give three fields: [mandel-coord screen-coord iters]
-(defrecord Point-Result [coord iters])
+(defrecord Point-Result [mandel-coord screen-coord iters])
 
 (defrecord Point-Results [source-bounds results])
+
+(defn untested-coord-pair [mandel-coord screen-coord]
+  (->Point-Result mandel-coord screen-coord nil))
+
+(defn record-test [point-result test-result]
+  (assoc point-result :iters test-result))
 
 #_
 (defn map-results [^Point-Results point-results, target-bounds]

@@ -1,4 +1,4 @@
-(ns mandelbrot-redo.text-main.main5
+(ns mandelbrot-redo.text-main.main
   (:require [mandelbrot-redo.logic.bounds :as mb]
             [mandelbrot-redo.logic.concurrent-finder :as mcf]
             [mandelbrot-redo.logic.helpers :as mh]
@@ -58,10 +58,10 @@
                                                          xy-mult xy-mult i-mult
                                                          xy-mult xy-mult i-mult) x y i)))))
 
-; FIXME: Super confusing. Implement change in Point-Result
 (defn draw-points [screen result-points color-f]
-  (doseq [[{[mx my] :coord, i :iters} [x y]] result-points]
-    (ls/put-string screen x y (str pixel-char)
+  (doseq [{[mx my] :mandel-coord,
+           [sx sy] :screen-coord, i :iters} result-points]
+    (ls/put-string screen sx sy (str pixel-char)
                    {:fg (color-f mx my i)}))
 
   (ls/redraw screen))
@@ -129,7 +129,7 @@
       \z (zoom (* 0.5 zoom-by))
       \x (zoom (- zoom-by))
 
-      \e mandel-bounds
+      \e mandel-bounds ; So we can refresh the color without closing
       \h initial-mandelbrot-bounds
 
       nil)))

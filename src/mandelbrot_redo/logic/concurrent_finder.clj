@@ -10,25 +10,25 @@
 
 (def pool (pool/new-basic-pool (* 2 (pool/available-processors))))
 
-(defn test-coord [coord]
-  (let [[x y :as d-coord] (mapv double coord)]
-    (mpr/->Point-Result
-      d-coord
-      (mi/standard-mandelbrot-test-convergence x y))))
+(defn test-and-record-result [untested-point-result]
+  (let [{[r i] :mandel-coord} untested-point-result]
+    (mpr/record-test untested-point-result
+                     (mi/standard-mandelbrot-test-convergence r i))))
 
-(defn update-mandel-coord-with-result [coord-pair]
-  (update coord-pair 0 test-coord))
+(defn wrap-in-untested-results [mandel-screen-coords]
+  (map (partial apply mpr/untested-coord-pair) mandel-screen-coords))
 
 (defn chunked-coords [division-perc mandel-bounds display-bounds]
-  (let [screen-coords (mh/mandel-screen-coords-in mandel-bounds display-bounds)
-        chunk-size (int (* division-perc (count screen-coords)))]
-    (partition chunk-size screen-coords)))
+  (let [coord-pairs (mh/mandel-screen-coords-in mandel-bounds display-bounds)
+        wrapped-coords (wrap-in-untested-results coord-pairs)
+        chunk-size (int (* division-perc (count wrapped-coords)))]
+    (partition chunk-size wrapped-coords)))
 
 ; ----- Sync methods. Return the result -----
 
 (defn naive-point-results-par [division-perc mandel-bounds display-bounds]
     (->> (chunked-coords division-perc mandel-bounds display-bounds)
-         (pmap #(mapv update-mandel-coord-with-result %))
+         (pmap #(mapv test-and-record-result %))
          (apply concat)
          (vec)))
 
@@ -37,7 +37,7 @@
     (->> (chunked-coords division-perc mandel-bounds display-bounds)
          (map (fn [chunk]
                 (future
-                  (mapv update-mandel-coord-with-result chunk))))
+                  (mapv test-and-record-result chunk))))
 
          (mapcat deref)
 
@@ -49,8 +49,8 @@
           targ-count (mb/area display-bounds)]
       (doseq [chunk chunks]
         (pool/submit-task pool
-          (swap! result-atom
-                 into (mapv update-mandel-coord-with-result chunk))))
+                          (swap! result-atom
+                                 into (mapv test-and-record-result chunk))))
 
       ; LOL
       (while (not= targ-count (count @result-atom))
@@ -64,7 +64,7 @@
 
     (doseq [agt agents]
       (send-off agt (fn [chunk]
-                      (mapv update-mandel-coord-with-result chunk))))
+                      (mapv test-and-record-result chunk))))
 
     (apply await agents)
 
@@ -79,7 +79,7 @@
   (let [chunks (chunked-coords division-perc mandel-bounds display-bounds)
 
         map-f (fn [chunk]
-                (let [chunk-result (mapv update-mandel-coord-with-result chunk)]
+                (let [chunk-result (mapv test-and-record-result chunk)]
                   (swap! result-atom
                          mar/add-results chunk-result)))]
 
@@ -94,7 +94,7 @@
   (->> chunk
        (reduce (fn [acc pair]
                  (if @running?-atom
-                   (conj! acc (update-mandel-coord-with-result pair))
+                   (conj! acc (test-and-record-result pair))
                    (reduced acc)))
                (transient []))
 
