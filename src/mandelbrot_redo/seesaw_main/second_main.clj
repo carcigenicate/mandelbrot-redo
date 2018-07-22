@@ -107,12 +107,12 @@
   (let [{:keys [results-atom mandel-bounds-atom]} ui-state
         changed? (atom false)]
     (swap! mandel-bounds-atom
-           #(if-let [new-state (mkh/alter-bounds-with-key? % (.getKeyCode e))]
-              (do
-                (reset! changed? true)
-                new-state)
+      #(if-let [new-state (mkh/alter-bounds-with-key? % (.getKeyCode e))]
+         (do
+           (reset! changed? true)
+           new-state)
 
-              %))
+         %))
 
     (when @changed?
       (mr/start-calculating-points! results-atom @mandel-bounds-atom canvas))))
