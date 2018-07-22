@@ -1,7 +1,6 @@
 (ns mandelbrot-redo.logic.point-result
   (:require [mandelbrot-redo.logic.helpers :as mh]))
 
-; TODO: Give three fields: [mandel-coord screen-coord iters]
 (defrecord Point-Result [mandel-coord screen-coord iters])
 
 (defrecord Point-Results [source-bounds results])

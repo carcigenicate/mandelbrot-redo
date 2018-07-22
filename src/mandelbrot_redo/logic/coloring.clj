@@ -1,17 +1,26 @@
 (ns mandelbrot-redo.logic.coloring
-  (:require [helpers.general-helpers :as g]))
+  (:require [helpers.general-helpers :as g]
+            [seesaw.color :as s-col]))
 
-(defrecord Multiples [x y i])
-(defrecord Color-Multiples [red green blue])
+(defrecord Multiples [red-x red-y red-i, green-x green-y green-i, blue-x blue-y blue-i])
 
-(defn create-color-f [x-red-mult y-red-mult i-red-mult
-                      x-green-mult y-green-mult i-green-mult
-                      x-blue-mult y-mult-blue i-blue-mult]
+(defrecord Color-Scheme [color-f multiples])
 
-  (letfn [(wrap [c] (g/wrap c 0 255))
-          (calc-channel [c r g b] (wrap (+ (* c r) (* c g) (* c b))))]
-
+(defn new-color-f
+  "Returns a function that takes [x y i], and returns a color tuple of [r g b]."
+  [multiples]
+  (let [wrap #(g/wrap % 0 255)
+        {:keys [red-x red-y red-i,
+                green-x green-y green-i,
+                blue-x blue-y blue-i]} multiples]
     (fn [x y i]
-      [(calc-channel x x-red-mult x-green-mult x-blue-mult)
-       (calc-channel y y-red-mult y-green-mult y-mult-blue)
-       (calc-channel i i-red-mult i-green-mult i-blue-mult)])))
+      (letfn [(calc-channel [xm ym im] (wrap (+ (* x xm) (* y ym) (* i im))))]
+        (s-col/color (calc-channel red-x red-y red-i)
+                     (calc-channel green-x green-y green-i)
+                     (calc-channel blue-x blue-y blue-i))))))
+
+(defn new-color-scheme [multiples]
+  (->Color-Scheme (new-color-f multiples) multiples))
+
+(defn apply-color-scheme [color-scheme x y i]
+  ((:color-f color-scheme) x y i))

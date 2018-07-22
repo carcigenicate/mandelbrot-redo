@@ -9,14 +9,15 @@
             [lanterna.screen :as ls]
 
             [criterium.core :as cc]
-            [mandelbrot-redo.thread-pool :as pool]))
+            [mandelbrot-redo.thread-pool :as pool])
+  (:import (java.awt Color)))
 
 (def pixel-char \█)
 
 (def term-width 300)
 (def term-height 150)
 (def term-font-size 3)
-(def term-type :swing)
+(def term-type :swing) ; :swing for semi nice but slow, :auto for crappy but fast
 
 (def main-scheduled-pool (pool/new-scheduled-thread-pool (* 2 (pool/available-processors))))
 
@@ -24,8 +25,8 @@
 (def key-press-check-rate (* draw-update-rate 2))
 
 (def initial-mandelbrot-bounds
-  (mb/map->Bounds {:min-x 0.34951178305690184, :max-x 0.36261898305727874,
-                   :min-y -0.6510800875446726, :max-y -0.6379728875442955}))
+  (mb/->Bounds 0.3553429385092607 0.3554179623077187
+               0.6426702348508788 0.6427452586493370))
 
 (def initial-display-bounds
   (mb/->Bounds 0 term-width 0 term-height))
@@ -34,8 +35,9 @@
 
 (def colors [:magenta :blue :cyan :green :yellow :red])
 
-(defn narrow-color-channels [color-triplet]
-  (let [highest (* 255 3)
+(defn narrow-color-channels [^Color color]
+  (let [color-triplet [(.getRed color) (.getGreen color) (.getBlue color)]
+        highest (* 255 3)
         sum (apply + color-triplet)
         perc (double (/ sum highest))
         i (int (* perc (count colors)))]
@@ -51,12 +53,15 @@
     (>= iters 5) :yellow
     :else :red))
 
-(def complex-color-f (fn [x y i] (let [xy-mult 50
-                                       i-mult 5]
-                                   (narrow-color-channels
-                                     ((mc/create-color-f xy-mult xy-mult i-mult
-                                                         xy-mult xy-mult i-mult
-                                                         xy-mult xy-mult i-mult) x y i)))))
+(def complex-color-f
+  (let [multiples (mc/->Multiples 21.45 -17.6 1.53
+                                  16.76 3.2 20.71
+                                  10.36 19.45 1.61)
+        color-f (mc/new-color-f multiples)]
+
+    (fn [x y i]
+      (narrow-color-channels
+        (color-f x y i)))))
 
 (defn draw-points [screen result-points color-f]
   (doseq [{[mx my] :mandel-coord,
@@ -66,22 +71,16 @@
 
   (ls/redraw screen))
 
-(defn start-calculating-points! [result-atom mandel-bounds display-bounds]
-  (mar/stop-process @result-atom)
-  (reset! result-atom mar/new-async-pack)
-
-  (mcf/pool-async-point-results
-    result-atom
-    point-division-perc
-    mandel-bounds
-    display-bounds))
+(defn start-calculating-points! [result-atom mandel-bounds screen-bounds]
+  (swap! result-atom
+         mar/add-results (mcf/naive-point-results-par point-division-perc mandel-bounds screen-bounds)))
 
 (defn draw-chunks [screen chunks]
   ; (ls/clear screen)
   ; (ls/redraw screen)
 
   (doseq [chunk chunks]
-    (draw-points screen chunk simple-color-f)))
+    (draw-points screen chunk complex-color-f)))
 
 (defn display-bounds-from-screen [screen]
   (let [[w h] (ls/get-size screen)]

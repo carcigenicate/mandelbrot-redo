@@ -4,9 +4,11 @@
             [mandelbrot-redo.logic.helpers :as mh]
             [mandelbrot-redo.thread-pool :as pool]
             [mandelbrot-redo.logic.bounds :as mb]
+            [mandelbrot-redo.logic.async-result :as mar]
 
-            [criterium.core :as cc]
-            [mandelbrot-redo.logic.async-result :as mar]))
+            [mandelbrot-redo.irrelevant.lazy-shuffle :as ils]
+
+            [criterium.core :as cc]))
 
 (def pool (pool/new-basic-pool (* 2 (pool/available-processors))))
 
@@ -18,14 +20,20 @@
 (defn wrap-in-untested-results [mandel-screen-coords]
   (map (partial apply mpr/untested-coord-pair) mandel-screen-coords))
 
-(defn chunked-coords [division-perc mandel-bounds display-bounds]
-  (let [coord-pairs (mh/mandel-screen-coords-in mandel-bounds display-bounds)
-        wrapped-coords (wrap-in-untested-results coord-pairs)
+(defn interuptable-chunked-coords [running?-atom division-perc mandel-bounds display-bounds]
+  (let [coord-pairs (mh/interuptable-mandel-display-coords-in running?-atom
+                                                              mandel-bounds
+                                                              display-bounds)
+        wrapped-coords (wrap-in-untested-results coord-pairs) ; Shuffle here for nice effect
         chunk-size (int (* division-perc (count wrapped-coords)))]
     (partition chunk-size wrapped-coords)))
 
+(defn chunked-coords [division-perc mandel-bounds display-bounds]
+  (interuptable-chunked-coords (atom true) division-perc mandel-bounds display-bounds))
+
 ; ----- Sync methods. Return the result -----
 
+; By far the best choice for sync
 (defn naive-point-results-par [division-perc mandel-bounds display-bounds]
     (->> (chunked-coords division-perc mandel-bounds display-bounds)
          (pmap #(mapv test-and-record-result %))
@@ -90,6 +98,7 @@
 
     nil))
 
+; TODO: Cut into subchunks to avoid the repetitive checks?
 (defn process-chunk [chunk running?-atom]
   (->> chunk
        (reduce (fn [acc pair]
@@ -105,16 +114,33 @@
          mar/add-results (process-chunk chunk running?-atom)))
 
 (defn pool-async-point-results [result-atom division-perc mandel-bounds display-bounds]
-  (let [chunks (chunked-coords division-perc mandel-bounds display-bounds)
-        running?-atom (atom true)
-        stop-f #(reset! running?-atom false)]
+  (let [running?-atom (atom true)
+        stop-f (fn [] (reset! running?-atom false)
+                      (println "Calculation terminated!"))]
 
     ; FIXME: Dangerous that the stop-f is set here, then results are added?
     ; FIXME: What if the async-pack is swapped after stop-f is set, but before the results are added?
     (swap! result-atom mar/set-stop-f stop-f)
 
-    (doseq [chunk chunks]
-      (pool/submit-task pool
-        (process-chunk! chunk result-atom running?-atom)))
+    (pool/submit-task pool
+      ; TODO: chunked-coords is taking awhile. If the operation is attempted to be cancelled
+      ; TODO:  before it returns, stop-f wont be valid, and this will continue on.
+      (let [chunks (time (interuptable-chunked-coords running?-atom division-perc mandel-bounds display-bounds))]
+        (doseq [chunk chunks]
+          (pool/submit-task pool
+            (process-chunk! chunk result-atom running?-atom)))))
 
     stop-f))
+
+(defn start-calculating-points! [point-division-perc result-atom mandel-bounds display-bounds]
+  ; swap f carries out side effects: The resetting of the atom via stop-process.
+  (swap! result-atom
+    (fn [result-pack]
+      (mar/stop-process result-pack)
+      mar/new-async-pack))
+
+  (pool-async-point-results
+    result-atom
+    point-division-perc
+    mandel-bounds
+    display-bounds))

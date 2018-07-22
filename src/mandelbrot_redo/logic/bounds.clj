@@ -25,7 +25,10 @@
              y-offset (+ y-offset height)))
 
   ([width height]
-   (from-dimensions 0 0 width height)))
+   (from-dimensions 0 0 width height))
+
+  ([[w h :as dimensions]]
+   (from-dimensions w h)))
 
 (defn- to-each [bounds min-x-f max-x-f min-y-f max-y-f]
   (-> bounds
@@ -39,7 +42,9 @@
            #(+ % x-offset) #(+ % x-offset)
            #(+ % y-offset) #(+ % y-offset)))
 
-(defn move-to [bounds x y]
+(defn move-to
+  "[x y] is the top-right corner to move to."
+  [bounds x y]
   (let [[w h] (dimensions bounds)]
     (from-dimensions x y w h)))
 
@@ -51,3 +56,10 @@
     (to-each bounds
              #(+ % min-offset) #(+ % max-offset)
              #(+ % min-offset) #(+ % max-offset))))
+
+(defn center-around [bounds x y]
+  (let [[half-w half-h] (->> bounds
+                             (dimensions)
+                             (mapv #(double (/ % 2))))]
+
+    (move-to bounds (- x half-w) (- y half-h))))
