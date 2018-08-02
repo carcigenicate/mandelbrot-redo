@@ -10,7 +10,7 @@
 
 (defn map-code-to-char [key-code]
   (or (arrow-key-code->keyword key-code)
-      (char key-code)))
+      (Character/toLowerCase (char key-code))))
 
 (defn alter-bounds-with-key? [mandel-bounds key-code]
   (let [b mandel-bounds

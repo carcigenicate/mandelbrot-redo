@@ -1,7 +1,8 @@
 (ns mandelbrot-redo.seesaw-main.helpers
   (:require [mandelbrot-redo.logic.bounds :as mb]
-            [seesaw.core :as sc])
-  (:import (java.awt Component)
+            [seesaw.core :as sc]
+            [mandelbrot-redo.logic.async-result :as mar])
+  (:import (java.awt Component Container)
            (javax.swing Timer)))
 
 (defn dimensions-of-component [^Component c]
@@ -25,3 +26,19 @@
     (fn [& args]
       (reset! args-atom args)
       (.restart ^Timer t))))
+
+(defn parse-double? [n]
+  (try
+    (Double/parseDouble n)
+
+    (catch NumberFormatException e
+      nil)))
+
+(defn force-result-repaint! [canvas results-atom]
+  (swap! results-atom mar/invalidate-all)
+  (sc/repaint! canvas))
+
+(defn get-root-of [^Container c]
+  (if-let [p (.getParent c)]
+    (recur p)
+    c))

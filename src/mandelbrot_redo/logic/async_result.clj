@@ -6,9 +6,10 @@
   (->Async-Pack [] [] (constantly nil)))
 
 (defn set-all-drawn [async-pack]
-  (assoc async-pack
-    :drawn-results (:new-results async-pack)
-    :new-results []))
+  (-> async-pack
+      (assoc :new-results [])
+      (update :drawn-results into (:new-results async-pack))))
+
 
 (defn add-results [async-pack results]
   (update async-pack :new-results conj results))
@@ -25,14 +26,32 @@
   (let [new-results-atom (atom [])]
     (swap! async-pack-atom
       (fn [ar]
-        (reset! new-results-atom (:new-results ar))
-        (first (get-and-set-new-results ar))))
+        (let [[new-ar results] (get-and-set-new-results ar)]
+          (reset! new-results-atom results)
+          new-ar)))
 
     @new-results-atom))
+
+(defn mark-and-get-all! [async-pack-atom]
+  (let [results-atom (atom [])]
+    (swap! async-pack-atom
+      (fn [ar]
+        ; TODO: Figure out which result set is bigger, and add the smaller to the larger
+        (reset! results-atom (into (:new-results ar) (:drawn-results ar)))
+
+        (set-all-drawn ar)))
+
+    @results-atom))
+
+
 
 (defn set-stop-f [async-pack stop-f]
   (assoc async-pack :stop-f stop-f))
 
 (defn stop-process [async-pack]
   ((:stop-f async-pack)))
+
+(defn invalidate-all [async-pack]
+  (assoc async-pack :new-results (:drawn-results async-pack)
+                    :drawn-results []))
 

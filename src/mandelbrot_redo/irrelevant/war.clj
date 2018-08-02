@@ -94,5 +94,5 @@
 (deftest test-play-game
          (testing "the player loses when they run out of cards"
            (is (->> cards
-                 (play)
-                 (some empty?)))))
+                    (play)
+                    (some empty?)))))

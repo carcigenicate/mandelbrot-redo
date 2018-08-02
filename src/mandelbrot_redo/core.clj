@@ -1,10 +1,10 @@
 (ns mandelbrot-redo.core
-  (:require [mandelbrot-redo.logic.mandelbrot-iteration :as mi]
+  (:require [mandelbrot-redo.seesaw-main.second-main :as msm]
 
-            [criterium.core :as cc])
+            [seesaw.core :as sc])
+
   (:gen-class))
 
-(defn -main
-  "I don't do a whole lot ... yet."
-  [& args]
-  (println "Hello, World!"))
+(defn -main [& args]
+  (-> (msm/new-frame)
+      (sc/show!)))

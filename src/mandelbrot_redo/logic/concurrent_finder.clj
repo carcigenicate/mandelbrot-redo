@@ -104,7 +104,7 @@
        (reduce (fn [acc pair]
                  (if @running?-atom
                    (conj! acc (test-and-record-result pair))
-                   (reduced acc)))
+                   (reduced (transient []))))
                (transient []))
 
        (persistent!)))

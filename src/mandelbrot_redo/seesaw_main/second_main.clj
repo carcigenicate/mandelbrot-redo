@@ -9,103 +9,97 @@
             [mandelbrot-redo.logic.concurrent-finder :as mcf]
             [mandelbrot-redo.logic.async-result :as mar]
             [mandelbrot-redo.logic.bounds :as mb]
-            [mandelbrot-redo.seesaw-main.helpers :as sh]
-            [mandelbrot-redo.seesaw-main.key-handler :as mkh]
             [mandelbrot-redo.logic.coloring :as mc]
             [mandelbrot-redo.logic.helpers :as mh]
-            [mandelbrot-redo.seesaw-main.recalculator :as mr])
+
+            [mandelbrot-redo.seesaw-main.helpers :as sh]
+            [mandelbrot-redo.seesaw-main.key-handler :as mkh]
+            [mandelbrot-redo.seesaw-main.recalculator :as mr]
+            [mandelbrot-redo.seesaw-main.animation-helpers :as mah]
+
+            [mandelbrot-redo.seesaw-main.sub-panels.color-scheme-panel :as mcsp]
+            [mandelbrot-redo.seesaw-main.sub-panels.preset-panel :as mpp]
+            [mandelbrot-redo.seesaw-main.sub-panels.canvas-panel :as mcp]
+            [mandelbrot-redo.thread-pool :as pool])
 
   (:import [javax.swing Timer]
-           [java.awt.event KeyEvent MouseEvent]))
+           [java.awt.event KeyEvent MouseEvent]
+           (java.awt Component)))
 
-(def loop-repaint-delay 250)
+; TODO: Make the color-multiples-atom hold a state that includes a history of previous states
+; TODO: Put navigation buttons around the canvas, and ditch key input
+; TODO: Make the preset-panel update the color-scheme panel.
 
-(def resize-delay 500)
+(def loop-repaint-delay 500)
+
+(def screen-ratio 0.4)
+(def initial-screen-width 1200)
+(def initial-screen-height (* initial-screen-width screen-ratio))
 
 (def initial-mandel-bounds
+  (mb/->Bounds -1 1, -1 1)
+  #_
   (mb/->Bounds 0.3560738161423556 0.3560741611398823
                -0.6445325894528111 -0.6445322444552848))
 
-(def color-f
-  (mc/new-color-f (mc/->Multiples 2.66 -3.29 2.67 3.34 4.47 -4.77 1.03 3.81 0.71)))
+(def initial-color-multiples
+  [2.66 -3.29 2.67 3.34 4.47 -4.77 1.03 3.81 0.71])
 
-(defrecord UI-State [results-atom mandel-bounds-atom color-f-atom])
+(def multiple-steps (vec (take 9 (range 0 20 0.01))))
 
-(defn new-ui-state [mandel-bounds color-f]
-  (->UI-State (atom mar/new-async-pack) (atom mandel-bounds) (atom color-f)))
+(defrecord UI-State [results-atom mandel-bounds-atom color-multiples-atom])
 
-(defn paint [results-atom cvs g]
-  (let [chunks (mar/get-and-set-new-results! results-atom)]
+(defn new-ui-state [mandel-bounds color-multiples]
+  (->UI-State (atom mar/new-async-pack) (atom mandel-bounds) (atom color-multiples)))
 
-    (when (seq chunks)
-      (println "Painting" (count chunks) "chunks of" (count (first chunks))))
-
-    ; TODO: Put in the when?
-    (doseq [chunk chunks
-            {[sx sy] :screen-coord, [mx my] :mandel-coord, i :iters} chunk]
-      (sg/draw g
-         (sg/rect sx sy 1)
-         (sg/style :background (color-f mx my i))))))
-
-(defn no-clear-paint [results-atom]
-  {:before (partial paint results-atom),
-   :super? false})
-
-(defn mouse-press-handler [ui-state, canvas, ^MouseEvent e]
-  (let [{:keys [results-atom mandel-bounds-atom]} ui-state
-        canvas-bounds (sh/bounds-from-component canvas)]
-    (swap! mandel-bounds-atom
-           (fn [b]
-             (let [zoom-by (->> b
-                                (mb/dimensions)
-                                (mapv #(double (/ % 2)))
-                                (apply min))
-
-                   zoom-mult (if (= (.getButton e) MouseEvent/BUTTON1) 0.6 -1)
-
-                   [mx my] (mh/map-coord [(.getX e) (.getY e)] canvas-bounds b)]
-
-               (-> b
-                   (mb/center-around mx my)
-                   (mb/adjust-size (* zoom-by zoom-mult))))))
-
-    (mr/start-calculating-points! results-atom @mandel-bounds-atom canvas)))
-
-(defn new-canvas [ui-state]
-  (let [{:keys [results-atom mandel-bounds-atom]} ui-state
-        canvas (sc/canvas :paint (no-clear-paint results-atom)
-                          :id :canvas)
-
-        resize-f (sh/new-non-repeatable-runner resize-delay
-                    (fn []
-                      (mr/start-calculating-points! results-atom @mandel-bounds-atom canvas)
-                      (println "New bounds:" (into {} (sh/bounds-from-component canvas)))))]
-
-    (sc/listen canvas
-               :component-resized (fn [_] (resize-f))
-
-               :mouse-pressed (partial mouse-press-handler ui-state canvas))
-
-    canvas))
-
-(defn start-repainting [repaint-delay canvas]
+(defn start-repainting [repaint-delay canvas results-atom]
   (let [t (sc/timer
-            (fn [_] (sc/repaint! canvas))
+            (fn [_]
+              (let [results @results-atom]
+                (when (seq (:new-results results))
+                  (sc/repaint! canvas))))
             :delay repaint-delay,
             :initial-delay repaint-delay)]
 
-    (fn [] (.stop ^Timer t))))
+    (fn []
+      (.stop ^Timer t))))
+#_
+(defn start-animating [change-delay canvas color-mutliples-atom]
+  (let [t (sc/timer
+            (fn [_]
+              (swap! color-mutliples-atom
+                ; TODO: Indicator that :current should be taken out and given to mah/advance?
+                (fn [mults]
+                  (let [anim-ranges (mah/from-steps 0 255 multiple-steps)]
+                    (->> anim-ranges
+                      (map #(assoc %2 :current %) mults)
+                      (pmap mah/advance) ; FIXME: pmap?
+                      (mapv :current)))))
+
+              (sc/repaint! canvas))
+
+            :initial-delay change-delay, :delay change-delay)]
+
+    (fn []
+      (.stop ^Timer t))))
 
 (defn new-main-panel [ui-state]
-  (let [canvas (new-canvas ui-state)
+  (let [main-panel (sc/border-panel)
 
-        main-panel (sc/border-panel :center canvas)]
+        canvas (mcp/new-direction-wrapped-canvas ui-state)
+
+        color-scheme-panel (mcsp/new-color-scheme-panel ui-state canvas)
+        preset-handler (mpp/new-preset-panel ui-state main-panel)]
+
+    (sc/config! main-panel :center canvas
+                           :east color-scheme-panel
+                           :west preset-handler)
 
     main-panel))
 
 (defn key-handler [ui-state, canvas, ^KeyEvent e]
   (let [{:keys [results-atom mandel-bounds-atom]} ui-state
-        changed? (atom false)]
+        changed? (atom false)] ; TODO: Eww
     (swap! mandel-bounds-atom
       #(if-let [new-state (mkh/alter-bounds-with-key? % (.getKeyCode e))]
          (do
@@ -118,22 +112,26 @@
       (mr/start-calculating-points! results-atom @mandel-bounds-atom canvas))))
 
 (defn new-frame []
-  (let [{:keys [results-atom] :as ui-state} (new-ui-state initial-mandel-bounds color-f)
+  (let [{:keys [results-atom color-multiples-atom] :as ui-state}
+        (new-ui-state initial-mandel-bounds
+                       initial-color-multiples)
 
         main-panel (new-main-panel ui-state)
 
         ; TODO: :on-close? Default is :hide?
-        frame (sc/frame :size [500 :by 500]
+        frame (sc/frame :size [initial-screen-width :by initial-screen-height]
                         :content main-panel)
 
         canvas (sc/select frame [:#canvas])
 
-        stop-repainting-f (start-repainting loop-repaint-delay canvas)]
+        stop-repainting-f (start-repainting loop-repaint-delay canvas results-atom)]
 
     (sc/listen frame
        :window-closing (fn [_]
                          (stop-repainting-f)
                          (mar/stop-process @results-atom)
+                         #_(pool/shutdown mcf/pool)
+                         ;(stop-animating)
 
                          (println "Cleaned up..."))
 
