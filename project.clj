@@ -7,7 +7,8 @@
                  [seesaw "1.4.5"]
                  [helpers "1"]
                  [criterium "0.4.4"]
-                 [clojure-lanterna "0.9.4"]]
+                 [clojure-lanterna "0.9.4"]
+                 [org.clojure/data.csv "0.1.4"]] ; Remove
   :main ^:skip-aot mandelbrot-redo.core
   :target-path "target/%s"
   :profiles {:uberjar {:aot :all}})

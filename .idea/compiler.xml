@@ -14,5 +14,8 @@
       <entry name="!?*.clj" />
       <entry name="!?*.aj" />
     </wildcardResourcePatterns>
+    <bytecodeTargetLevel target="11">
+      <module name="mandelbrot-redo" target="" />
+    </bytecodeTargetLevel>
   </component>
 </project>
