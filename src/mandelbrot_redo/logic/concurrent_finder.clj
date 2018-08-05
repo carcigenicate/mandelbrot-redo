@@ -25,7 +25,7 @@
                                                               mandel-bounds
                                                               display-bounds)
         wrapped-coords (wrap-in-untested-results coord-pairs) ; Shuffle here for nice effect
-        chunk-size (int (* division-perc (count wrapped-coords)))]
+        chunk-size (int (* division-perc (mb/area display-bounds)))]
     (partition chunk-size wrapped-coords)))
 
 (defn chunked-coords [division-perc mandel-bounds display-bounds]
@@ -33,12 +33,19 @@
 
 ; ----- Sync methods. Return the result -----
 
-; By far the best choice for sync
-(defn naive-point-results-par [division-perc mandel-bounds display-bounds]
+; The "naive" versions are by far the best choice for sync
+(defn lazy-naive-point-results-par [division-perc mandel-bounds display-bounds]
     (->> (chunked-coords division-perc mandel-bounds display-bounds)
-         (pmap #(mapv test-and-record-result %))
-         (apply concat)
-         (vec)))
+         (pmap #(mapv test-and-record-result %))))
+
+(defn interuptable-lazy-naive-point-results-par [running?-atom division-perc mandel-bounds display-bounds]
+  (->> (interuptable-chunked-coords running?-atom division-perc
+                                    mandel-bounds display-bounds)
+       (pmap #(mapv test-and-record-result %))))
+
+(defn strict-naive-point-results-par [division-perc mandel-bounds display-bounds]
+  (->> (lazy-naive-point-results-par division-perc mandel-bounds display-bounds)
+       (vec)))
 
 ; FAIL
 (defn two-pass-future-point-results [division-perc mandel-bounds display-bounds]

@@ -73,7 +73,7 @@
 
 (defn start-calculating-points! [result-atom mandel-bounds screen-bounds]
   (swap! result-atom
-         mar/add-results (mcf/naive-point-results-par point-division-perc mandel-bounds screen-bounds)))
+         mar/add-results (mcf/strict-naive-point-results-par point-division-perc mandel-bounds screen-bounds)))
 
 (defn draw-chunks [screen chunks]
   ; (ls/clear screen)

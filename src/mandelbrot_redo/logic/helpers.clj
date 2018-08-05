@@ -1,5 +1,8 @@
 (ns mandelbrot-redo.logic.helpers
-  (:require [helpers.general-helpers :as g]))
+  (:require [helpers.general-helpers :as g]
+            [mandelbrot-redo.logic.bounds :as mb]
+
+            [criterium.core :as cc]))
 
 (defn map-coord [coord source-bounds target-bounds]
   (let [[x y] coord

@@ -1,5 +1,4 @@
-(ns mandelbrot-redo.logic.bounds
-  (:require [mandelbrot-redo.logic.helpers :as mh]))
+(ns mandelbrot-redo.logic.bounds)
 
 (defrecord Bounds [min-x max-x min-y max-y])
 
@@ -20,15 +19,15 @@
        (apply *)))
 
 (defn from-dimensions
-  ([x-offset y-offset width height]
-   (->Bounds x-offset (+ x-offset width)
-             y-offset (+ y-offset height)))
-
   ([width height]
    (from-dimensions 0 0 width height))
 
   ([[w h :as dimensions]]
-   (from-dimensions w h)))
+   (from-dimensions w h))
+
+  ([x-offset y-offset width height]
+   (->Bounds x-offset (+ x-offset width)
+             y-offset (+ y-offset height))))
 
 (defn- to-each [bounds min-x-f max-x-f min-y-f max-y-f]
   (-> bounds
