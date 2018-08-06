@@ -14,7 +14,7 @@
 
 ; TODO: Add a callback that passes the total for progress updates?
 ; How am I going to find how many results there are?
-(defn produce-image-from-results [result-chunks color-f image-dimensions callback-f]
+(defn produce-image-from-results [running?-atom result-chunks color-f image-dimensions callback-f]
   (let [[width height] image-dimensions
         total-results (apply * image-dimensions)
         ^BufferedImage img (BufferedImage. width height BufferedImage/TYPE_INT_RGB)
@@ -26,7 +26,9 @@
             :let [[sx sy] screen-coord
                   [mx my] mandel-coord
                   color-int (.getRGB ^Color (color-f mx my iters))
-                  result-n @result-n-atom]]
+                  result-n @result-n-atom]
+
+            :while @running?-atom]
 
       (callback-f result-n total-results)
 
@@ -43,6 +45,7 @@
 
 (defn save-image [^String save-name, ^String path, ^BufferedImage img]
   (let [path (str path "\\" save-name \. image-type-ext)]
+    (clojure.java.io/make-parents path)
     (ImageIO/write img, ^String image-type-ext, (File. path))))
 
 #_(let [w 1500

@@ -20,6 +20,7 @@
             [mandelbrot-redo.seesaw-main.sub-panels.color-scheme-panel :as mcsp]
             [mandelbrot-redo.seesaw-main.sub-panels.preset-panel :as mpp]
             [mandelbrot-redo.seesaw-main.sub-panels.canvas-panel :as mcp]
+            [mandelbrot-redo.seesaw-main.saving.save-panel :as msp]
             [mandelbrot-redo.thread-pool :as pool])
 
   (:import [javax.swing Timer]
@@ -32,7 +33,7 @@
 
 (def loop-repaint-delay 500)
 
-(def screen-ratio 0.4)
+(def screen-ratio 0.5)
 (def initial-screen-width 1200)
 (def initial-screen-height (* initial-screen-width screen-ratio))
 
@@ -89,11 +90,13 @@
         canvas (mcp/new-direction-wrapped-canvas ui-state)
 
         color-scheme-panel (mcsp/new-color-scheme-panel ui-state canvas)
-        preset-handler (mpp/new-preset-panel ui-state main-panel)]
+        preset-panel (mpp/new-preset-panel ui-state main-panel)
+        save-panel (msp/new-main-panel ui-state)]
 
     (sc/config! main-panel :center canvas
-                           :east color-scheme-panel
-                           :west preset-handler)
+                :east color-scheme-panel
+                :west preset-panel
+                :south save-panel)
 
     main-panel))
 
@@ -112,7 +115,7 @@
       (mr/start-calculating-points! results-atom @mandel-bounds-atom canvas))))
 
 (defn new-frame []
-  (let [{:keys [results-atom color-multiples-atom] :as ui-state}
+  (let [{:keys [results-atom] :as ui-state}
         (new-ui-state initial-mandel-bounds
                        initial-color-multiples)
 

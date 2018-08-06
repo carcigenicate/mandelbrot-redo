@@ -7,7 +7,8 @@
             [seesaw.core :as sc]
             [mandelbrot-redo.logic.coloring :as mc]
             [mandelbrot-redo.logic.async-result :as mar])
-  (:import (java.awt.event MouseEvent)))
+  (:import (java.awt.event MouseEvent)
+           (java.awt Component)))
 
 (def resize-delay 500)
 (def offset-dimension-perc 0.5)
