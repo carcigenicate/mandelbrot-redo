@@ -19,20 +19,21 @@
 
 ; Single-run task pool and methods
 
-(defn new-basic-pool
+(defn new-fixed-pool
   ([n-threads]
    (new-controlled-thread-pool
      #(Executors/newFixedThreadPool n-threads)))
 
   ([]
-   (new-basic-pool (available-processors))))
+   (new-fixed-pool (available-processors))))
 
 (defn submit-task* [^ExecutorService pool, ^Runnable f]
   (.execute pool f))
 
+; TODO: Using "once" to prevent unecessary data retention.
+; Apparently "once" is an implementation detail of the language though?
 (defmacro submit-task [^ExecutorService pool & body]
-  `(submit-task* ~pool (fn [] ~@body)))
-
+  `(submit-task* ~pool (^:once fn* [] ~@body)))
 
 ; Sheduled task pool and methods
 

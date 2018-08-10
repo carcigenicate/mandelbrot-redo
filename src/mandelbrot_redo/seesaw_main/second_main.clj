@@ -28,8 +28,6 @@
            (java.awt Component)))
 
 ; TODO: Make the color-multiples-atom hold a state that includes a history of previous states
-; TODO: Put navigation buttons around the canvas, and ditch key input
-; TODO: Make the preset-panel update the color-scheme panel.
 
 (def loop-repaint-delay 500)
 
@@ -84,6 +82,21 @@
     (fn []
       (.stop ^Timer t))))
 
+(defn show-save-frame [ui-state]
+  (let [save-frame (msp/new-save-frame ui-state)]
+    (-> save-frame
+        (sc/show!))))
+
+(defn new-frame-panel [ui-state]
+  (let [btn (sc/button :text "Open Save Window", :halign :center)
+        panel (sc/horizontal-panel :items [btn])]
+
+    (sc/listen btn
+               :action (fn [_]
+                         (show-save-frame ui-state)))
+
+    panel))
+
 (defn new-main-panel [ui-state]
   (let [main-panel (sc/border-panel)
 
@@ -91,15 +104,16 @@
 
         color-scheme-panel (mcsp/new-color-scheme-panel ui-state canvas)
         preset-panel (mpp/new-preset-panel ui-state main-panel)
-        save-panel (msp/new-main-panel ui-state)]
+        frame-panel (new-frame-panel ui-state)]
 
     (sc/config! main-panel :center canvas
                 :east color-scheme-panel
                 :west preset-panel
-                :south save-panel)
+                :south frame-panel)
 
     main-panel))
 
+#_
 (defn key-handler [ui-state, canvas, ^KeyEvent e]
   (let [{:keys [results-atom mandel-bounds-atom]} ui-state
         changed? (atom false)] ; TODO: Eww
@@ -136,9 +150,7 @@
                          #_(pool/shutdown mcf/pool)
                          ;(stop-animating)
 
-                         (println "Cleaned up..."))
-
-       :key-pressed (partial key-handler ui-state canvas))
+                         (println "Cleaned up...")))
 
 
     frame))

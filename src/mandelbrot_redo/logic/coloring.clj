@@ -20,6 +20,7 @@
                      (calc-channel green-x green-y green-i)
                      (calc-channel blue-x blue-y blue-i))))))
 
+; TODO: Remove? No point in storing color-f when it's relatively cheap to make.
 (defn new-color-scheme [multiples]
   (->Color-Scheme (new-color-f multiples) multiples))
 

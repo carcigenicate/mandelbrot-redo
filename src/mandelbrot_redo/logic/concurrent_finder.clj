@@ -6,11 +6,10 @@
             [mandelbrot-redo.logic.bounds :as mb]
             [mandelbrot-redo.logic.async-result :as mar]
 
-            [mandelbrot-redo.irrelevant.lazy-shuffle :as ils]
+            [criterium.core :as cc])
+  (:import (java.util.concurrent Executors)))
 
-            [criterium.core :as cc]))
-
-(def pool (pool/new-basic-pool (* 2 (pool/available-processors))))
+(def pool (Executors/newCachedThreadPool))
 
 (defn test-and-record-result [untested-point-result]
   (let [{[r i] :mandel-coord} untested-point-result]
@@ -20,11 +19,15 @@
 (defn wrap-in-untested-results [mandel-screen-coords]
   (map (partial apply mpr/untested-coord-pair) mandel-screen-coords))
 
-(defn interuptable-chunked-coords [running?-atom division-perc mandel-bounds display-bounds]
+(defn interuptable-unchunked-coords [running?-atom mandel-bounds display-bounds]
   (let [coord-pairs (mh/interuptable-mandel-display-coords-in running?-atom
                                                               mandel-bounds
-                                                              display-bounds)
-        wrapped-coords (wrap-in-untested-results coord-pairs) ; Shuffle here for nice effect
+                                                              display-bounds)]
+
+    (wrap-in-untested-results coord-pairs))) ; Shuffle here for nice effect
+
+(defn interuptable-chunked-coords [running?-atom division-perc mandel-bounds display-bounds]
+  (let [wrapped-coords (interuptable-unchunked-coords running?-atom mandel-bounds display-bounds)
         chunk-size (int (* division-perc (mb/area display-bounds)))]
     (partition chunk-size wrapped-coords)))
 
@@ -34,17 +37,26 @@
 ; ----- Sync methods. Return the result -----
 
 ; The "naive" versions are by far the best choice for sync
-(defn lazy-naive-point-results-par [division-perc mandel-bounds display-bounds]
+(defn lazy-pmap-point-results [division-perc mandel-bounds display-bounds]
     (->> (chunked-coords division-perc mandel-bounds display-bounds)
          (pmap #(mapv test-and-record-result %))))
 
-(defn interuptable-lazy-naive-point-results-par [running?-atom division-perc mandel-bounds display-bounds]
+(defn interuptable-lazy-pmap-point-results [running?-atom division-perc mandel-bounds display-bounds]
   (->> (interuptable-chunked-coords running?-atom division-perc
                                     mandel-bounds display-bounds)
        (pmap #(mapv test-and-record-result %))))
 
+(defn interuptable-strict-pmap-point-results [running?-atom division-perc mandel-bounds display-bounds]
+  (->> (interuptable-lazy-pmap-point-results
+         running?-atom division-perc mandel-bounds display-bounds)
+       (vec)))
+
+(defn iteruptable-unchunked-lazy-pmap-point-results [running?-atom mandel-bounds display-bounds]
+  (pmap test-and-record-result
+        (interuptable-unchunked-coords running?-atom mandel-bounds display-bounds)))
+
 (defn strict-naive-point-results-par [division-perc mandel-bounds display-bounds]
-  (->> (lazy-naive-point-results-par division-perc mandel-bounds display-bounds)
+  (->> (lazy-pmap-point-results division-perc mandel-bounds display-bounds)
        (vec)))
 
 ; FAIL
@@ -54,7 +66,7 @@
                 (future
                   (mapv test-and-record-result chunk))))
 
-         (mapcat deref)
+         (map deref)
 
          (vec)))
 
